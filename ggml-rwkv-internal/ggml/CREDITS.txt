@@ -1,0 +1,4 @@
+Vendored version: https://github.com/saharNooby/rwkv.cpp/tree/e4268a36c8d7e7d86904aedd0aec6e5ba2733a7d
+
+The ggml.c and ggml.h files are distributed under the terms of the MIT license.
+Credit goes to the original authors: Copyright (c) 2023 Georgi Gerganov

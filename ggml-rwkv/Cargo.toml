@@ -1,0 +1,7 @@
+[package]
+name = "ggml-rwkv"
+version = { workspace = true }
+edition = "2021"
+
+[dependencies]
+ggml-rwkv-internal = { path = "../ggml-rwkv-internal" }
