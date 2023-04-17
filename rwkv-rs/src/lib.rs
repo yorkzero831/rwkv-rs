@@ -2,6 +2,7 @@
 //! rwkv-rs is a Rust port of the rwkv.cpp project. This allows running inference for RWKV model on a CPU with good performance using full precision, f16 or 4-bit quantized versions of the model.
 use crate::vocabulary::{TokenBias, TokenId};
 
+use crate::util::autodetect_num_threads;
 use thiserror::Error;
 
 mod loader;
@@ -39,7 +40,7 @@ pub struct InferenceParameters {
 impl Default for InferenceParameters {
     fn default() -> Self {
         Self {
-            n_threads: 8,
+            n_threads: autodetect_num_threads(),
             n_batch: 8,
             top_k: 40,
             top_p: 0.95,

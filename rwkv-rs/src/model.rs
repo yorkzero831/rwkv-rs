@@ -1,6 +1,7 @@
 use crate::loader;
 use crate::loader::{LoadError, LoadProgress};
 use crate::rwkv_session::{InferenceSession, InferenceSessionParameters};
+use crate::vocabulary::Vocabulary;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -23,6 +24,8 @@ pub struct Model {
 
     pub(crate) head: ggml_rwkv::Tensor,
 
+    pub vocabulary: Vocabulary,
+
     // Must be kept alive for the model
     _context: ggml_rwkv::Context,
 }
@@ -32,6 +35,7 @@ impl Model {
         context: ggml_rwkv::Context,
         hparams: Hyperparameters,
         wtype: ggml_rwkv::Type,
+        vocabulary: Vocabulary,
     ) -> Model {
         let n_embd = hparams.n_embed;
         let n_layer = hparams.n_layer;
@@ -153,6 +157,7 @@ impl Model {
             ln_out_weight,
             ln_out_bias,
             head: head_weight,
+            vocabulary,
             _context: context,
         }
     }
@@ -165,10 +170,11 @@ impl Model {
     ///
     /// The status of the loading process will be reported through `load_progress_callback`.
     pub fn load(
-        path: impl AsRef<Path>,
+        model_path: impl AsRef<Path>,
+        vocabulary_json_path: impl AsRef<Path>,
         load_progress_callback: impl FnMut(LoadProgress),
     ) -> Result<Model, LoadError> {
-        loader::load(path, load_progress_callback)
+        loader::load(model_path, vocabulary_json_path, load_progress_callback)
     }
 
     /// Starts a new `InferenceSession` for this model.

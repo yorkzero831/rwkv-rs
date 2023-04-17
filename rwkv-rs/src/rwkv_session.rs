@@ -1,10 +1,10 @@
 use crate::model::Model;
 use crate::util::mulf;
 use crate::vocabulary::TokenId;
-use crate::{EvaluateOutputRequest, InferenceParameters};
+use crate::{EvaluateOutputRequest, InferenceError, InferenceParameters};
 use ggml_rwkv::{ComputationGraph, Tensor, Type};
 use partial_sort::PartialSort;
-use rand::{distributions::WeightedIndex, prelude::Distribution};
+use rand::{distributions::WeightedIndex, prelude::Distribution, Rng};
 use std::cmp::max;
 use std::ptr::copy_nonoverlapping;
 
@@ -83,6 +83,8 @@ impl InferenceSession {
             ctx_size
         };
         let session_ctx = ggml_rwkv::Context::init(ctx_size);
+
+        // Build graph
         let state = session_ctx.new_tensor_1d(Type::F32, n_layer * 5 * n_embd);
 
         // x = self.w.emb.weight[token]
@@ -253,11 +255,7 @@ impl InferenceSession {
         }
     }
 
-    pub fn sample_top_p_top_k(
-        &self,
-        params: &InferenceParameters,
-        rng: &mut impl rand::Rng,
-    ) -> TokenId {
+    pub fn sample_top_p_top_k(&self, params: &InferenceParameters, rng: &mut impl Rng) -> TokenId {
         let logits = &self.last_logits;
         let n_logits = logits.len();
         let mut logits_id = Vec::<(f32, TokenId)>::with_capacity(n_logits);
@@ -345,12 +343,9 @@ impl InferenceSession {
             .saturating_sub(self.params.repetition_penalty_last_n)..]
     }
 
-    pub fn evaluate(
-        &mut self,
-        model: &Model,
-        input_tokens: &[TokenId],
-        // output_request: &mut EvaluateOutputRequest,
-    ) {
+    pub fn evaluate(&mut self, model: &Model, input_tokens: &TokenId) {
+        let n = 1;
+
         let n_layer = model.hparams.n_layer;
         let n_embed = model.hparams.n_embed;
         let n_vocab = model.hparams.n_vocab;
@@ -358,41 +353,83 @@ impl InferenceSession {
         let ctx = &self._session_ctx;
 
         // for first time
-        // if self.mem_per_token == 0 {
-        //     ctx.op_set_f32(&self.state, 0.0f32);
-        //     for i in 0..n_layer {
-        //         ctx.op_set_f32(
-        //             &ctx.op_view_1d(&self.state, n_embed, (5 * i + 4) * n_embed * FP32_SIZE),
-        //             -1e30,
-        //         );
-        //     }
-        // }
-
-        for token in input_tokens {
-            ctx.op_set_i32(&self.token_index, 0);
-            ctx.op_set_i32_1d(&self.token_index, 0, *token);
-
-            ctx.graph_compute(&mut self.graph);
-
-            for i in 0..(n_layer * 5) {
-                let part = &self.state_parts[i];
-                unsafe {
-                    let src = part.data();
-                    let dst = self.state.data();
-                    let count = part.get_ne()[0] as usize * FP32_SIZE;
-                    copy_nonoverlapping(src, dst.wrapping_offset((i * n_embed) as isize), count);
-                }
+        if self.mem_per_token == 0 {
+            ctx.op_set_f32(&self.state, 0.0f32);
+            for i in 0..n_layer {
+                ctx.op_set_f32(
+                    &ctx.op_view_1d(&self.state, n_embed, (5 * i + 4) * n_embed * FP32_SIZE),
+                    -1e30,
+                );
             }
+        }
 
+        ctx.op_set_i32(&self.token_index, 0);
+        ctx.op_set_i32_1d(&self.token_index, 0, *input_tokens);
+
+        ctx.graph_compute(&mut self.graph);
+
+        for i in 0..(n_layer * 5) {
+            let part = &self.state_parts[i];
             unsafe {
-                let src = self.logits.data();
-                let dst = self.last_logits.as_mut_ptr();
-
-                self.logits
-                    .read_data(0, bytemuck::cast_slice_mut(self.last_logits.as_mut_slice()));
+                let src = part.data();
+                let dst = self.state.data();
+                let count = part.get_ne()[0] as usize * FP32_SIZE;
+                copy_nonoverlapping(src, dst.wrapping_offset((i * n_embed) as isize), count);
             }
+        }
+
+        unsafe {
+            let src = self.logits.data();
+            let dst = self.last_logits.as_mut_ptr();
+
+            self.logits
+                .read_data(0, bytemuck::cast_slice_mut(self.last_logits.as_mut_slice()));
+        }
+        // Adjust the required memory per token if we didn't know that already
+        if self.mem_per_token == 0 {
+            self.mem_per_token = ctx.used_mem() / n;
         }
 
         println!("{}mb", self._session_ctx.used_mem() / 1024 / 1024)
     }
+}
+
+impl InferenceSession {
+    // // Feed a prompt to the model for this session.
+    // pub fn feed_prompt<E: std::error::Error + 'static>(
+    //     &mut self,
+    //     model: &Model,
+    //     params: &InferenceParameters,
+    //     prompt: &str,
+    //     mut callback: impl FnMut(&[u8]) -> Result<(), E>,
+    // ) -> Result<(), InferenceError> {
+    //     let beginning_of_sentence = self.n_past == 0;
+    //
+    //     let vocab = model.vocabulary();
+    //     let prompt_tokens: Vec<TokenId> = vocab
+    //         .tokenize(prompt, beginning_of_sentence)?
+    //         .iter()
+    //         .map(|(_, tok)| *tok)
+    //         .collect();
+    //
+    //     if self.n_past + prompt_tokens.len() >= model.hparams.n_ctx {
+    //         return Err(InferenceError::ContextFull);
+    //     }
+    //
+    //     for batch in prompt_tokens.chunks(params.n_batch) {
+    //         self.evaluate(model, batch);
+    //         for &tk in batch {
+    //             // NOTE: No string ever tokenizes to the end of sentence. So we
+    //             // can just return the id here.
+    //             if let Err(e) = callback(vocab.token(tk as usize)) {
+    //                 return Err(InferenceError::UserCallback(Box::new(e)));
+    //             }
+    //
+    //             // Update the tokens for this session
+    //             self.tokens.push(tk);
+    //         }
+    //     }
+    //
+    //     Ok(())
+    // }
 }

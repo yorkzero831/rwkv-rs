@@ -1,11 +1,15 @@
 use crate::model::{Hyperparameters, Model};
+use rand::SeedableRng;
 use std::env::temp_dir;
-use std::io::{BufRead, Read};
+use std::io;
+use std::io::{BufRead, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::abort;
 
 use crate::rwkv_session::InferenceSessionParameters;
 use crate::util::mulf;
+use crate::vocabulary::Vocabulary;
+use crate::InferenceParameters;
 use thiserror::Error;
 
 /// Each variant represents a step within the process of loading the model.
@@ -132,13 +136,14 @@ pub enum LoadError {
 pub const RWKV_FORMAT_VERSION: u32 = 100;
 
 pub fn load(
-    path: impl AsRef<Path>,
+    model_path: impl AsRef<Path>,
+    vocabulary_json_path: impl AsRef<Path>,
     mut load_progress_callback: impl FnMut(LoadProgress),
 ) -> Result<Model, LoadError> {
     use std::fs::File;
     use std::io::BufReader;
 
-    let main_path = path.as_ref();
+    let main_path = model_path.as_ref();
 
     let file_size = main_path.metadata().unwrap().len();
 
@@ -308,7 +313,10 @@ pub fn load(
     // Initialize the context
     let context = ggml_rwkv::Context::init(ctx_size);
 
-    let model = Model::new(context, hparams, wtype);
+    // Initialize the vocabulary
+    let vocabulary = Vocabulary::new(vocabulary_json_path);
+
+    let model = Model::new(context, hparams, wtype, vocabulary);
 
     // hence rwkv usually has only one model file, so ignore partially read.
 
@@ -438,11 +446,45 @@ pub fn read_string(reader: &mut impl BufRead, len: usize) -> Result<String, Load
 fn test() {
     let model = load(
         "D:/AI/rwkv/RWKV-4-Raven-3B-v7-ChnEng-Q4_1.bin",
+        "D:/AI/rwkv/rwkv.cpp/rwkv/20B_tokenizer.json",
         |progress| {},
     )
     .expect("TODO: panic message");
+
+    let params = InferenceParameters::default();
+
+    println!("finish loading");
+
+    let mut rng = rand::rngs::StdRng::from_entropy();
+
+    let prompt = r#"Transcript of a dialog, where the User interacts with an Assistant named Bob. Bob is helpful, kind, honest, good at writing, and never fails to answer the User's requests immediately and with precision.
+
+User: Hello, Bob.
+Bob: Hello. How may I help you today?
+User: Please tell me the largest city in Europe.
+Bob: Sure. The largest city in Europe is Moscow, the capital of Russia."#;
+
     let mut session = model.start_session(InferenceSessionParameters::default());
-    let input_tokenss = vec![12i32];
-    session.evaluate(&model, input_tokenss.as_slice());
+    let input_tokens = model.vocabulary.encode(prompt);
+    for token in input_tokens {
+        session.evaluate(&model, &token);
+    }
+
+    println!("finish process prompt");
+
+    let new_token = model.vocabulary.encode("\nUser: Hello\nBob:");
+    for token in new_token {
+        session.evaluate(&model, &token);
+    }
+
+    println!("Bob:");
+
+    for i in 0..100 {
+        let next = session.sample_top_p_top_k(&params, &mut rng);
+        let a = model.vocabulary.decode(next);
+        print!("{}", a);
+        session.evaluate(&model, &next);
+    }
+
     println!("{}", 1)
 }

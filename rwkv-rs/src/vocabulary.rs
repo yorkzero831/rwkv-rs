@@ -1,5 +1,8 @@
 use crate::InferenceError;
+use std::path::Path;
 use std::{collections::HashMap, str::FromStr};
+
+use tokenizers::Tokenizer;
 
 /// The identifier of a token in a vocabulary.
 pub type TokenId = i32;
@@ -10,77 +13,29 @@ pub(crate) type TokenScore = f32;
 #[derive(Debug, Clone)]
 pub struct Vocabulary {
     /// Maps every integer (index) token id to its corresponding token
-    pub(crate) id_to_token: Vec<Token>,
-
-    /// Maps every integer (index) token id to corresponding score
-    pub(crate) id_to_token_score: Vec<TokenScore>,
-
-    /// Maps a token to a token id
-    pub(crate) token_to_id: HashMap<Token, TokenId>,
-
-    /// The longest token in this vocabulary
-    pub(crate) max_token_length: usize,
+    tokenizer: Tokenizer,
 }
 impl Vocabulary {
-    pub(crate) fn token(&self, idx: usize) -> &[u8] {
-        &self.id_to_token[idx]
+    pub(crate) fn new(path: impl AsRef<Path>) -> Vocabulary {
+        let tokenizer = Tokenizer::from_file(path).unwrap();
+        Vocabulary { tokenizer }
     }
 
-    // SentencePiece implementation after https://guillaume-be.github.io/2020-05-30/sentence_piece
-    /// Tokenize a `text` with this vocabulary.
-    ///
-    /// `bos` controls whether a beginning-of-string token should be inserted.
-    pub fn tokenize<'a>(
-        &'a self,
-        text: &str,
-        bos: bool,
-    ) -> Result<Vec<(&'a [u8], TokenId)>, InferenceError> {
-        let len = text.len();
+    pub fn encode(&self, input: &str) -> Vec<i32> {
+        let input_tokens_encoding = self.tokenizer.encode(input, false).unwrap();
+        let input_tokens = input_tokens_encoding.get_ids();
 
-        let mut score = vec![0usize; len + 1];
-        let mut prev = vec![TokenId::default(); len + 1];
-
-        for i in 0..len {
-            let max_len = (len - i).min(self.max_token_length);
-            for sub_len in 1..=max_len {
-                let sub = &text.as_bytes()[i..i + sub_len];
-                let token = self.token_to_id.get(sub);
-
-                if let Some(token) = token {
-                    let token_score = sub.len() * sub.len();
-                    let local_score = score[i] + token_score;
-                    let next = i + sub_len;
-
-                    if score[next] < local_score {
-                        score[next] = local_score;
-                        prev[next] = *token;
-                    }
-                }
-            }
+        let mut ids = Vec::with_capacity(input.len());
+        for t in input_tokens {
+            ids.push(*t as i32)
         }
+        ids
+    }
 
-        // Backward pass
-        let mut res = vec![];
-        let mut i = len;
-        while i > 0 {
-            let token_id = prev[i];
-            if token_id == 0 {
-                return Err(InferenceError::TokenizationFailed);
-            }
-            let token = self.id_to_token[token_id as usize].as_slice();
-            res.push((token, token_id));
-            i -= token.len();
-        }
-
-        if bos {
-            // TODO: replace with vocab.bos
-            res.push((&[], 1));
-        }
-
-        // Pieces are in reverse order so correct that
-        res.reverse();
-
-        Ok(res)
+    pub fn decode(&self, input: i32) -> String {
+        self.tokenizer
+            .decode(Vec::from([input as u32]), false)
+            .unwrap()
     }
 }
 
@@ -93,22 +48,17 @@ impl Vocabulary {
 /// This can be used to disable the generation of responses
 /// with specific tokens by setting their corresponding bias
 /// to -1.0.
-pub struct TokenBias(Vec<(TokenId, f32)>);
+pub struct TokenBias(HashMap<TokenId, f32>);
 
 impl TokenBias {
     /// Create a [TokenBias] from an existing `Vec`.
-    pub fn new(mut v: Vec<(TokenId, f32)>) -> Self {
-        v.sort_by_cached_key(|(tid, _)| *tid);
-        v.dedup_by_key(|(tid, _)| *tid);
+    pub fn new(mut v: HashMap<TokenId, f32>) -> Self {
         Self(v)
     }
 
     /// Retrieves the bias for a given token, if available.
     pub fn get(&self, tid: TokenId) -> Option<f32> {
-        self.0
-            .binary_search_by_key(&tid, |(tid, _)| *tid)
-            .map(|idx| self.0[idx].1)
-            .ok()
+        self.0.get(&tid).map(|x| *x)
     }
 }
 
