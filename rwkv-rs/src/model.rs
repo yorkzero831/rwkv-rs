@@ -27,7 +27,7 @@ pub struct Model {
     pub vocabulary: Vocabulary,
 
     // Must be kept alive for the model
-    _context: ggml_rwkv::Context,
+    pub(crate) _context: ggml_rwkv::Context,
 }
 
 impl Model {

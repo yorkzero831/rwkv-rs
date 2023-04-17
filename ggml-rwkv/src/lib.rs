@@ -471,6 +471,26 @@ impl Context {
         self.new_tensor_raw(tensor)
     }
 
+    ///
+    pub fn get_system_info(&self) -> String {
+        unsafe {
+            format!("AVX = {} | AVX2 = {} | AVX512 = {} | FMA = {} | NEON = {} | ARM_FMA = {} | F16C = {} | FP16_VA = {} | WASM_SIMD = {} | BLAS = {} | SSE3 = {} | VSX = {} |",
+                    ggml_rwkv_internal::ggml_cpu_has_avx(),
+                    ggml_rwkv_internal::ggml_cpu_has_avx2(),
+                    ggml_rwkv_internal::ggml_cpu_has_avx512(),
+                    ggml_rwkv_internal::ggml_cpu_has_fma(),
+                    ggml_rwkv_internal::ggml_cpu_has_neon(),
+                    ggml_rwkv_internal::ggml_cpu_has_arm_fma(),
+                    ggml_rwkv_internal::ggml_cpu_has_f16c(),
+                    ggml_rwkv_internal::ggml_cpu_has_fp16_va(),
+                    ggml_rwkv_internal::ggml_cpu_has_wasm_simd(),
+                    ggml_rwkv_internal::ggml_cpu_has_blas(),
+                    ggml_rwkv_internal::ggml_cpu_has_sse3(),
+                    ggml_rwkv_internal::ggml_cpu_has_vsx(),
+            )
+        }
+    }
+
     /// Computes the specified graph. Must be run in order to evaluate the graph.
     pub fn graph_compute(&self, graph: &mut ComputationGraph) {
         unsafe {

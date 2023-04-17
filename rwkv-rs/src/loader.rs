@@ -451,6 +451,8 @@ fn test() {
     )
     .expect("TODO: panic message");
 
+    println!("{}", model._context.get_system_info());
+
     let params = InferenceParameters::default();
 
     println!("finish loading");
