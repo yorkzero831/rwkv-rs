@@ -59,7 +59,7 @@ pub enum LoadError {
     /// A file failed to open.
     OpenFileFailed {
         /// The original error.
-        source: std::io::Error,
+        source: io::Error,
         /// The path that failed.
         path: PathBuf,
     },
@@ -73,13 +73,13 @@ pub enum LoadError {
     /// Reading exactly `bytes` from a file failed.
     ReadExactFailed {
         /// The original error.
-        source: std::io::Error,
+        source: io::Error,
         /// The number of bytes that were attempted to be read.
         bytes: usize,
     },
     #[error("non-specific I/O error")]
     /// A non-specific IO error.
-    IO(#[from] std::io::Error),
+    IO(#[from] io::Error),
     #[error("could not convert bytes to a UTF-8 string")]
     /// One of the strings encountered was not valid UTF-8.
     InvalidUtf8(#[from] std::string::FromUtf8Error),
@@ -331,19 +331,19 @@ pub fn load(
 
         let n_dims = usize::try_from(read_i32(&mut reader)?)?;
         let key_length = read_i32(&mut reader)?;
-        let data_t = read_i32(&mut reader)?;
+        // let data_t = read_i32(&mut reader)?;
 
-        let ggml_data_type = match data_t {
-            0 => ggml_rwkv::Type::F32,
-            1 => ggml_rwkv::Type::F16,
-            2 => ggml_rwkv::Type::Q4_0,
-            3 => ggml_rwkv::Type::Q4_1,
-            invalid => {
-                return Err(LoadError::HyperparametersF16Invalid {
-                    ftype: invalid as u32,
-                })
-            }
-        };
+        // let ggml_data_type = match data_t {
+        //     0 => ggml_rwkv::Type::F32,
+        //     1 => ggml_rwkv::Type::F16,
+        //     2 => ggml_rwkv::Type::Q4_0,
+        //     3 => ggml_rwkv::Type::Q4_1,
+        //     invalid => {
+        //         return Err(LoadError::HyperparametersF16Invalid {
+        //             ftype: invalid as u32,
+        //         })
+        //     }
+        // };
 
         let mut nelements = 1;
         let mut ne = [1i64, 1i64];
@@ -382,6 +382,18 @@ pub fn load(
         n_tensors = n_tensors + 1;
         total_size += tensor.nbytes();
     }
+    // assert_eq!(
+    //     model.emb.get_ne()[0] as usize,
+    //     n_embed,
+    //     "Unexpected dimension of embedding matrix {}",
+    //     model.emb.get_ne()[0]
+    // );
+    // assert_eq!(
+    //     model.emb.get_ne()[1] as usize,
+    //     n_vocab,
+    //     "Unexpected dimension of embedding matrix {}",
+    //     model.emb.get_ne()[1]
+    // );
 
     println!(
         "Loaded tensor_count:{}, total_bytes:{}",
@@ -459,12 +471,7 @@ fn test() {
 
     let mut rng = rand::rngs::StdRng::from_entropy();
 
-    let prompt = r#"Transcript of a dialog, where the User interacts with an Assistant named Bob. Bob is helpful, kind, honest, good at writing, and never fails to answer the User's requests immediately and with precision.
-
-User: Hello, Bob.
-Bob: Hello. How may I help you today?
-User: Please tell me the largest city in Europe.
-Bob: Sure. The largest city in Europe is Moscow, the capital of Russia."#;
+    let prompt = r#"hello"#;
 
     let mut session = model.start_session(InferenceSessionParameters::default());
     let input_tokens = model.vocabulary.encode(prompt);
@@ -474,14 +481,14 @@ Bob: Sure. The largest city in Europe is Moscow, the capital of Russia."#;
 
     println!("finish process prompt");
 
-    let new_token = model.vocabulary.encode("\nUser: Hello\nBob:");
+    let new_token = model.vocabulary.encode("你好");
     for token in new_token {
         session.evaluate(&model, &token);
     }
 
     println!("Bob:");
 
-    for i in 0..100 {
+    for _ in 0..100 {
         let next = session.sample_top_p_top_k(&params, &mut rng);
         let a = model.vocabulary.decode(next);
         print!("{}", a);

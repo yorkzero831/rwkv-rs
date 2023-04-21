@@ -31,7 +31,8 @@ pub const ggml_type_GGML_TYPE_Q8_0: ggml_type = 4;
 pub const ggml_type_GGML_TYPE_I8: ggml_type = 5;
 pub const ggml_type_GGML_TYPE_I16: ggml_type = 6;
 pub const ggml_type_GGML_TYPE_I32: ggml_type = 7;
-pub const ggml_type_GGML_TYPE_COUNT: ggml_type = 8;
+pub const ggml_type_GGML_TYPE_Q4_1_O: ggml_type = 8;
+pub const ggml_type_GGML_TYPE_COUNT: ggml_type = 9;
 pub type ggml_type = ::std::os::raw::c_int;
 pub const ggml_op_GGML_OP_NONE: ggml_op = 0;
 pub const ggml_op_GGML_OP_DUP: ggml_op = 1;
@@ -47,35 +48,31 @@ pub const ggml_op_GGML_OP_REPEAT: ggml_op = 10;
 pub const ggml_op_GGML_OP_ABS: ggml_op = 11;
 pub const ggml_op_GGML_OP_SGN: ggml_op = 12;
 pub const ggml_op_GGML_OP_NEG: ggml_op = 13;
-pub const ggml_op_GGML_OP_EXP: ggml_op = 14;
-pub const ggml_op_GGML_OP_1_MINUS_X: ggml_op = 15;
-pub const ggml_op_GGML_OP_MAX: ggml_op = 16;
-pub const ggml_op_GGML_OP_STEP: ggml_op = 17;
-pub const ggml_op_GGML_OP_RELU: ggml_op = 18;
-pub const ggml_op_GGML_OP_GELU: ggml_op = 19;
-pub const ggml_op_GGML_OP_SIGMOID: ggml_op = 20;
-pub const ggml_op_GGML_OP_SILU: ggml_op = 21;
-pub const ggml_op_GGML_OP_NORM: ggml_op = 22;
-pub const ggml_op_GGML_OP_RMS_NORM: ggml_op = 23;
-pub const ggml_op_GGML_OP_MUL_MAT: ggml_op = 24;
-pub const ggml_op_GGML_OP_SCALE: ggml_op = 25;
-pub const ggml_op_GGML_OP_CPY: ggml_op = 26;
-pub const ggml_op_GGML_OP_CONT: ggml_op = 27;
-pub const ggml_op_GGML_OP_RESHAPE: ggml_op = 28;
-pub const ggml_op_GGML_OP_VIEW: ggml_op = 29;
-pub const ggml_op_GGML_OP_PERMUTE: ggml_op = 30;
-pub const ggml_op_GGML_OP_TRANSPOSE: ggml_op = 31;
-pub const ggml_op_GGML_OP_GET_ROWS: ggml_op = 32;
-pub const ggml_op_GGML_OP_DIAG_MASK_INF: ggml_op = 33;
-pub const ggml_op_GGML_OP_SOFT_MAX: ggml_op = 34;
-pub const ggml_op_GGML_OP_ROPE: ggml_op = 35;
-pub const ggml_op_GGML_OP_CONV_1D_1S: ggml_op = 36;
-pub const ggml_op_GGML_OP_CONV_1D_2S: ggml_op = 37;
-pub const ggml_op_GGML_OP_FLASH_ATTN: ggml_op = 38;
-pub const ggml_op_GGML_OP_FLASH_FF: ggml_op = 39;
-pub const ggml_op_GGML_OP_MAP_UNARY: ggml_op = 40;
-pub const ggml_op_GGML_OP_MAP_BINARY: ggml_op = 41;
-pub const ggml_op_GGML_OP_COUNT: ggml_op = 42;
+pub const ggml_op_GGML_OP_STEP: ggml_op = 14;
+pub const ggml_op_GGML_OP_RELU: ggml_op = 15;
+pub const ggml_op_GGML_OP_GELU: ggml_op = 16;
+pub const ggml_op_GGML_OP_SILU: ggml_op = 17;
+pub const ggml_op_GGML_OP_NORM: ggml_op = 18;
+pub const ggml_op_GGML_OP_RMS_NORM: ggml_op = 19;
+pub const ggml_op_GGML_OP_MUL_MAT: ggml_op = 20;
+pub const ggml_op_GGML_OP_SCALE: ggml_op = 21;
+pub const ggml_op_GGML_OP_CPY: ggml_op = 22;
+pub const ggml_op_GGML_OP_CONT: ggml_op = 23;
+pub const ggml_op_GGML_OP_RESHAPE: ggml_op = 24;
+pub const ggml_op_GGML_OP_VIEW: ggml_op = 25;
+pub const ggml_op_GGML_OP_PERMUTE: ggml_op = 26;
+pub const ggml_op_GGML_OP_TRANSPOSE: ggml_op = 27;
+pub const ggml_op_GGML_OP_GET_ROWS: ggml_op = 28;
+pub const ggml_op_GGML_OP_DIAG_MASK_INF: ggml_op = 29;
+pub const ggml_op_GGML_OP_SOFT_MAX: ggml_op = 30;
+pub const ggml_op_GGML_OP_ROPE: ggml_op = 31;
+pub const ggml_op_GGML_OP_CONV_1D_1S: ggml_op = 32;
+pub const ggml_op_GGML_OP_CONV_1D_2S: ggml_op = 33;
+pub const ggml_op_GGML_OP_FLASH_ATTN: ggml_op = 34;
+pub const ggml_op_GGML_OP_FLASH_FF: ggml_op = 35;
+pub const ggml_op_GGML_OP_MAP_UNARY: ggml_op = 36;
+pub const ggml_op_GGML_OP_MAP_BINARY: ggml_op = 37;
+pub const ggml_op_GGML_OP_COUNT: ggml_op = 38;
 pub type ggml_op = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -775,19 +772,6 @@ extern "C" {
     pub fn ggml_neg(ctx: *mut ggml_context, a: *mut ggml_tensor) -> *mut ggml_tensor;
 }
 extern "C" {
-    pub fn ggml_exp(ctx: *mut ggml_context, a: *mut ggml_tensor) -> *mut ggml_tensor;
-}
-extern "C" {
-    pub fn ggml_1_minus_x(ctx: *mut ggml_context, a: *mut ggml_tensor) -> *mut ggml_tensor;
-}
-extern "C" {
-    pub fn ggml_max(
-        ctx: *mut ggml_context,
-        a: *mut ggml_tensor,
-        b: *mut ggml_tensor,
-    ) -> *mut ggml_tensor;
-}
-extern "C" {
     pub fn ggml_step(ctx: *mut ggml_context, a: *mut ggml_tensor) -> *mut ggml_tensor;
 }
 extern "C" {
@@ -795,9 +779,6 @@ extern "C" {
 }
 extern "C" {
     pub fn ggml_gelu(ctx: *mut ggml_context, a: *mut ggml_tensor) -> *mut ggml_tensor;
-}
-extern "C" {
-    pub fn ggml_sigmoid(ctx: *mut ggml_context, a: *mut ggml_tensor) -> *mut ggml_tensor;
 }
 extern "C" {
     pub fn ggml_silu(ctx: *mut ggml_context, a: *mut ggml_tensor) -> *mut ggml_tensor;
@@ -1390,6 +1371,15 @@ extern "C" {
 }
 extern "C" {
     pub fn ggml_quantize_q4_1(
+        src: *const f32,
+        dst: *mut ::std::os::raw::c_void,
+        n: ::std::os::raw::c_int,
+        k: ::std::os::raw::c_int,
+        hist: *mut i64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn ggml_quantize_q4_1_o(
         src: *const f32,
         dst: *mut ::std::os::raw::c_void,
         n: ::std::os::raw::c_int,

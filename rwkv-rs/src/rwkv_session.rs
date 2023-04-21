@@ -5,6 +5,7 @@ use crate::{EvaluateOutputRequest, InferenceError, InferenceParameters};
 use ggml_rwkv::{ComputationGraph, Tensor, Type};
 use partial_sort::PartialSort;
 use rand::{distributions::WeightedIndex, prelude::Distribution, Rng};
+use std::arch::x86_64::_xrstor;
 use std::cmp::max;
 use std::ptr::copy_nonoverlapping;
 
@@ -41,7 +42,7 @@ pub struct InferenceSession {
     pub(crate) state_parts: Vec<Tensor>,
     pub(crate) logits: Tensor,
 
-    pub(crate) graph: ggml_rwkv::ComputationGraph,
+    pub(crate) graph: ComputationGraph,
 
     /// How much memory is required per token for the temporary context used
     /// during inference.
@@ -55,6 +56,14 @@ pub struct InferenceSession {
 }
 
 const FP32_SIZE: usize = 4;
+
+fn check_date(t: &Tensor) -> Vec<f32> {
+    let mut aac = vec![0.0f32; t.nelements()];
+    unsafe {
+        t.read_data(0, bytemuck::cast_slice_mut(aac.as_mut_slice()));
+        return aac;
+    }
+}
 
 impl InferenceSession {
     pub(crate) fn new(params: InferenceSessionParameters, model: &Model) -> InferenceSession {
@@ -95,7 +104,6 @@ impl InferenceSession {
         x = session_ctx.op_rwkv_layer_norm(&x, &model.ln0_weight, &model.ln0_bias);
 
         // We collect parts of new state here. Each part is (n_embed) vector.
-
         let mut v0: Tensor;
         let mut v1: Tensor;
         let mut v2: Tensor;
@@ -233,8 +241,9 @@ impl InferenceSession {
 
         // x = (self.w.head.weight @ x).float()
         let logits = session_ctx.op_mul_mat(&model.head, &x);
-        let mut graph = ComputationGraph::new(params.n_thread);
-        graph.build_forward_expand(&logits);
+
+        let mut graph = ComputationGraph::new_with_tensor(params.n_thread, &logits);
+        // graph.build_forward_expand(&logits);
 
         for i in 0..n_layer * 5 {
             graph.build_forward_expand(&state_parts[i])
@@ -259,6 +268,7 @@ impl InferenceSession {
         let logits = &self.last_logits;
         let n_logits = logits.len();
         let mut logits_id = Vec::<(f32, TokenId)>::with_capacity(n_logits);
+        println!("{}", 1);
 
         {
             let scale = 1.0 / params.temperature;
@@ -348,7 +358,7 @@ impl InferenceSession {
 
         let n_layer = model.hparams.n_layer;
         let n_embed = model.hparams.n_embed;
-        let n_vocab = model.hparams.n_vocab;
+        //let n_vocab = model.hparams.n_vocab;
 
         let ctx = &self._session_ctx;
 
@@ -368,6 +378,14 @@ impl InferenceSession {
 
         ctx.graph_compute(&mut self.graph);
 
+        // let p0 = check_date(&self.state_parts[0]);
+        // let p1 = check_date(&self.state_parts[1]);
+        // let p2 = check_date(&self.state_parts[2]);
+        // let p3 = check_date(&self.state_parts[3]);
+        // let p4 = check_date(&self.state_parts[4]);
+        //
+        // let s1 = check_date(&self.state);
+
         for i in 0..(n_layer * 5) {
             let part = &self.state_parts[i];
             unsafe {
@@ -379,18 +397,16 @@ impl InferenceSession {
         }
 
         unsafe {
-            let src = self.logits.data();
-            let dst = self.last_logits.as_mut_ptr();
-
             self.logits
                 .read_data(0, bytemuck::cast_slice_mut(self.last_logits.as_mut_slice()));
         }
+
         // Adjust the required memory per token if we didn't know that already
         if self.mem_per_token == 0 {
             self.mem_per_token = ctx.used_mem() / n;
         }
 
-        println!("{}mb", self._session_ctx.used_mem() / 1024 / 1024)
+        println!("\n{}mb", self._session_ctx.used_mem() / 1024 / 1024)
     }
 }
 

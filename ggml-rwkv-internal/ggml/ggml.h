@@ -208,6 +208,10 @@ enum ggml_type {
     GGML_TYPE_I8,
     GGML_TYPE_I16,
     GGML_TYPE_I32,
+    // Stores min, delta and a single outlier value for a block.
+    // An outlier is the single absmax element in the quantized block.
+    // Matmul is done in FP32.
+    GGML_TYPE_Q4_1_O,
     GGML_TYPE_COUNT,
 };
 
@@ -228,22 +232,9 @@ enum ggml_op {
     GGML_OP_ABS,
     GGML_OP_SGN,
     GGML_OP_NEG,
-    // Element-wise exponential function `e^x`.
-    // Same as `torch.exp(x)` from PyTorch.
-    GGML_OP_EXP,
-    // Element-wise `1 - x`.
-    GGML_OP_1_MINUS_X,
-
-    // Element-wise maximum of 2 values. Argument shapes must match.
-    // Same as `torch.maximum(x)` from PyTorch.
-    GGML_OP_MAX,
-
     GGML_OP_STEP,
     GGML_OP_RELU,
     GGML_OP_GELU,
-    // Element-wise sigmoid activation `1 / (1 + e^-x)`, also called logistic function.
-    // Same as `torch.sigmoid(x)` from PyTorch.
-    GGML_OP_SIGMOID,
     GGML_OP_SILU,
     GGML_OP_NORM, // normalize
     GGML_OP_RMS_NORM,
@@ -496,19 +487,6 @@ struct ggml_tensor * ggml_neg(
         struct ggml_context * ctx,
         struct ggml_tensor  * a);
 
-struct ggml_tensor * ggml_exp(
-        struct ggml_context * ctx,
-        struct ggml_tensor  * a);
-
-struct ggml_tensor * ggml_1_minus_x(
-        struct ggml_context * ctx,
-        struct ggml_tensor  * a);
-
-struct ggml_tensor * ggml_max(
-        struct ggml_context * ctx,
-        struct ggml_tensor  * a,
-        struct ggml_tensor  * b);
-
 struct ggml_tensor * ggml_step(
         struct ggml_context * ctx,
         struct ggml_tensor  * a);
@@ -519,10 +497,6 @@ struct ggml_tensor * ggml_relu(
 
 // TODO: double-check this computation is correct
 struct ggml_tensor * ggml_gelu(
-        struct ggml_context * ctx,
-        struct ggml_tensor  * a);
-
-struct ggml_tensor * ggml_sigmoid(
         struct ggml_context * ctx,
         struct ggml_tensor  * a);
 
@@ -830,6 +804,7 @@ enum ggml_opt_result ggml_opt(
 
 size_t ggml_quantize_q4_0(const float * src, void * dst, int n, int k, int64_t * hist);
 size_t ggml_quantize_q4_1(const float * src, void * dst, int n, int k, int64_t * hist);
+size_t ggml_quantize_q4_1_o(const float * src, void * dst, int n, int k, int64_t * hist);
 
 //
 // system info

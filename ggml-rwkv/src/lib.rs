@@ -81,6 +81,49 @@ pub struct Context {
     /// with it if the underlying context has been deallocated.
     ptr: Arc<NonNull<ggml_rwkv_internal::ggml_context>>,
 }
+
+#[no_mangle]
+extern "C" fn rwkv_exp_impl(n_cols: std::os::raw::c_int, dest: *mut f32, src: *const f32) {
+    unsafe {
+        for i in 0..n_cols {
+            *dest.offset(i as isize) = (*(src.offset(i as isize))).exp();
+        }
+    }
+}
+
+#[no_mangle]
+extern "C" fn rwkv_1_minus_x_impl(n_cols: std::os::raw::c_int, dest: *mut f32, src: *const f32) {
+    unsafe {
+        for i in 0..n_cols {
+            *dest.offset(i as isize) = 1.0f32 - *(src.offset(i as isize));
+        }
+    }
+}
+
+#[no_mangle]
+extern "C" fn rwkv_sigmoid_impl(n_cols: std::os::raw::c_int, dest: *mut f32, src: *const f32) {
+    unsafe {
+        for i in 0..n_cols {
+            *dest.offset(i as isize) =
+                1.0f32 / (1.0f32 + (*(src.offset(i as isize)) * -1.0f32).exp());
+        }
+    }
+}
+
+#[no_mangle]
+extern "C" fn rwkv_max_impl(
+    n_cols: std::os::raw::c_int,
+    dest: *mut f32,
+    src0: *const f32,
+    src1: *const f32,
+) {
+    unsafe {
+        for i in 0..n_cols {
+            *dest.offset(i as isize) = (*(src0.offset(i as isize))).max(*(src1.offset(i as isize)));
+        }
+    }
+}
+
 impl Context {
     /// Creates a new [Context] with the specified `mem_size` as a working area.
     pub fn init(mem_size: usize) -> Self {
@@ -172,38 +215,87 @@ impl Context {
     /// Looks like ggml_norm does the first part, we only need to apply weight & bias.
     pub fn op_rwkv_layer_norm(&self, x: &Tensor, weight: &Tensor, bias: &Tensor) -> Tensor {
         let tensor = unsafe {
-            let mut x = ggml_rwkv_internal::ggml_norm(self.ptr.as_ptr(), x.ptr.as_ptr());
-            x = ggml_rwkv_internal::ggml_mul(self.ptr.as_ptr(), x, weight.ptr.as_ptr());
-            x = ggml_rwkv_internal::ggml_add(self.ptr.as_ptr(), x, bias.ptr.as_ptr());
-            x
+            let mut xx = ggml_rwkv_internal::ggml_norm(self.ptr.as_ptr(), x.ptr.as_ptr());
+            xx = ggml_rwkv_internal::ggml_mul(self.ptr.as_ptr(), xx, weight.ptr.as_ptr());
+            xx = ggml_rwkv_internal::ggml_add(self.ptr.as_ptr(), xx, bias.ptr.as_ptr());
+            xx
+        };
+        self.new_tensor_raw(tensor)
+    }
+
+    // ///
+    // pub fn op_exp(&self, a: &Tensor) -> Tensor {
+    //     let tensor = unsafe { ggml_rwkv_internal::ggml_exp(self.ptr.as_ptr(), a.ptr.as_ptr()) };
+    //     self.new_tensor_raw(tensor)
+    // }
+    //
+    // ///
+    // pub fn op_1_minus_x(&self, a: &Tensor) -> Tensor {
+    //     let tensor =
+    //         unsafe { ggml_rwkv_internal::ggml_1_minus_x(self.ptr.as_ptr(), a.ptr.as_ptr()) };
+    //     self.new_tensor_raw(tensor)
+    // }
+    //
+    // ///
+    // pub fn op_max(&self, a: &Tensor, b: &Tensor) -> Tensor {
+    //     let tensor = unsafe {
+    //         ggml_rwkv_internal::ggml_max(self.ptr.as_ptr(), a.ptr.as_ptr(), b.ptr.as_ptr())
+    //     };
+    //     self.new_tensor_raw(tensor)
+    // }
+    //
+    // ///
+    // pub fn op_sigmoid(&self, a: &Tensor) -> Tensor {
+    //     let tensor = unsafe { ggml_rwkv_internal::ggml_sigmoid(self.ptr.as_ptr(), a.ptr.as_ptr()) };
+    //     self.new_tensor_raw(tensor)
+    // }
+
+    ///
+    pub fn op_exp(&self, a: &Tensor) -> Tensor {
+        let tensor = unsafe {
+            ggml_rwkv_internal::ggml_map_unary_f32(
+                self.ptr.as_ptr(),
+                a.ptr.as_ptr(),
+                Some(rwkv_exp_impl),
+            )
         };
         self.new_tensor_raw(tensor)
     }
 
     ///
-    pub fn op_exp(&self, a: &Tensor) -> Tensor {
-        let tensor = unsafe { ggml_rwkv_internal::ggml_exp(self.ptr.as_ptr(), a.ptr.as_ptr()) };
-        self.new_tensor_raw(tensor)
-    }
-
-    ///
     pub fn op_1_minus_x(&self, a: &Tensor) -> Tensor {
-        let tensor =
-            unsafe { ggml_rwkv_internal::ggml_1_minus_x(self.ptr.as_ptr(), a.ptr.as_ptr()) };
+        let tensor = unsafe {
+            ggml_rwkv_internal::ggml_map_unary_f32(
+                self.ptr.as_ptr(),
+                a.ptr.as_ptr(),
+                Some(rwkv_1_minus_x_impl),
+            )
+        };
         self.new_tensor_raw(tensor)
     }
 
     ///
     pub fn op_max(&self, a: &Tensor, b: &Tensor) -> Tensor {
         let tensor = unsafe {
-            ggml_rwkv_internal::ggml_max(self.ptr.as_ptr(), a.ptr.as_ptr(), b.ptr.as_ptr())
+            ggml_rwkv_internal::ggml_map_binary_f32(
+                self.ptr.as_ptr(),
+                a.ptr.as_ptr(),
+                b.ptr.as_ptr(),
+                Some(rwkv_max_impl),
+            )
         };
         self.new_tensor_raw(tensor)
     }
 
     ///
     pub fn op_sigmoid(&self, a: &Tensor) -> Tensor {
-        let tensor = unsafe { ggml_rwkv_internal::ggml_sigmoid(self.ptr.as_ptr(), a.ptr.as_ptr()) };
+        let tensor = unsafe {
+            ggml_rwkv_internal::ggml_map_unary_f32(
+                self.ptr.as_ptr(),
+                a.ptr.as_ptr(),
+                Some(rwkv_sigmoid_impl),
+            )
+        };
         self.new_tensor_raw(tensor)
     }
 
@@ -461,7 +553,7 @@ impl Context {
     }
 
     ///
-    pub fn op_set_i32_1d(&self, a: &Tensor, i: ::std::os::raw::c_int, value: i32) {
+    pub fn op_set_i32_1d(&self, a: &Tensor, i: std::os::raw::c_int, value: i32) {
         unsafe { ggml_rwkv_internal::ggml_set_i32_1d(a.ptr.as_ptr(), i, value) };
     }
 
@@ -673,6 +765,15 @@ impl ComputationGraph {
                 // just leaves it uninitialized
                 ..unsafe { std::mem::zeroed::<ggml_rwkv_internal::ggml_cgraph>() }
             },
+        }
+    }
+
+    ///
+    pub fn new_with_tensor(n_threads: usize, tensor: &Tensor) -> Self {
+        unsafe {
+            let mut graph = ggml_rwkv_internal::ggml_build_forward(tensor.ptr.as_ptr());
+            graph.n_threads = ::std::os::raw::c_int::try_from(n_threads).unwrap();
+            Self { inner: graph }
         }
     }
 
