@@ -331,19 +331,19 @@ pub fn load(
 
         let n_dims = usize::try_from(read_i32(&mut reader)?)?;
         let key_length = read_i32(&mut reader)?;
-        // let data_t = read_i32(&mut reader)?;
+        let data_t = read_i32(&mut reader)?;
 
-        // let ggml_data_type = match data_t {
-        //     0 => ggml_rwkv::Type::F32,
-        //     1 => ggml_rwkv::Type::F16,
-        //     2 => ggml_rwkv::Type::Q4_0,
-        //     3 => ggml_rwkv::Type::Q4_1,
-        //     invalid => {
-        //         return Err(LoadError::HyperparametersF16Invalid {
-        //             ftype: invalid as u32,
-        //         })
-        //     }
-        // };
+        let ggml_data_type = match data_t {
+            0 => ggml_rwkv::Type::F32,
+            1 => ggml_rwkv::Type::F16,
+            2 => ggml_rwkv::Type::Q4_0,
+            3 => ggml_rwkv::Type::Q4_1,
+            invalid => {
+                return Err(LoadError::HyperparametersF16Invalid {
+                    ftype: invalid as u32,
+                })
+            }
+        };
 
         let mut nelements = 1;
         let mut ne = [1i64, 1i64];
@@ -467,11 +467,15 @@ fn test() {
 
     let params = InferenceParameters::default();
 
-    println!("finish loading");
+    println!("finish loading ");
 
     let mut rng = rand::rngs::StdRng::from_entropy();
 
-    let prompt = r#"hello"#;
+    let prompt = r#"Transcript of a dialog, where the User interacts with an Assistant named Bob. Bob is helpful, kind, honest, good at writing, and never fails to answer the User's requests immediately and with precision.
+User: Hello, Bob.
+Bob: Hello. How may I help you today?
+User: Please tell me the largest city in Europe.
+Bob: Sure. The largest city in Europe is Moscow, the capital of Russia."#;
 
     let mut session = model.start_session(InferenceSessionParameters::default());
     let input_tokens = model.vocabulary.encode(prompt);
