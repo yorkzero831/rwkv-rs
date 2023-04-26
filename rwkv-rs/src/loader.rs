@@ -5,6 +5,7 @@ use std::io;
 use std::io::{BufRead, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::abort;
+use std::time::Instant;
 
 use crate::rwkv_session::InferenceSessionParameters;
 use crate::util::mulf;
@@ -365,7 +366,17 @@ pub fn load(
                 return Err(LoadError::UnknownTensor { tensor_name, path: main_path.to_owned() });
             };
 
-        //println!("n_dims:{}, ne[0]:{}, ne[1]:{}, tensor_name:{}, nelements: {}, nbytes: {}", n_dims, ne[0], ne[1], tensor_name, tensor.nelements(), tensor.nbytes());
+        println!(
+            "n_dims:{}, ne[0]:{}, ne[1]:{}, 1x2: {} tensor_name:{}, nelements: {}, nbytes: {}, type: {}",
+            n_dims,
+            ne[0],
+            ne[1],
+            ne[0] * ne[1],
+            tensor_name,
+            tensor.nelements(),
+            tensor.nbytes(),
+            tensor.get_type()
+        );
 
         if tensor.nelements() != nelements {
             return Err(LoadError::TensorWrongSize {
@@ -378,7 +389,7 @@ pub fn load(
             let data = tensor.data();
             std::slice::from_raw_parts_mut(data as *mut u8, tensor.nbytes())
         };
-        reader.read_exact(slice);
+        reader.read_exact(slice).expect("can not read data");
         n_tensors = n_tensors + 1;
         total_size += tensor.nbytes();
     }
@@ -479,8 +490,15 @@ Bob: Sure. The largest city in Europe is Moscow, the capital of Russia."#;
 
     let mut session = model.start_session(InferenceSessionParameters::default());
     let input_tokens = model.vocabulary.encode(prompt);
-    for token in input_tokens {
+    let now = Instant::now();
+    for (i, token) in input_tokens.iter().enumerate() {
         session.evaluate(&model, &token);
+        println!(
+            "load {}/{} in {}",
+            i + 1,
+            input_tokens.len(),
+            now.elapsed().as_millis()
+        )
     }
 
     println!("finish process prompt");

@@ -27,12 +27,14 @@ pub const ggml_type_GGML_TYPE_F32: ggml_type = 0;
 pub const ggml_type_GGML_TYPE_F16: ggml_type = 1;
 pub const ggml_type_GGML_TYPE_Q4_0: ggml_type = 2;
 pub const ggml_type_GGML_TYPE_Q4_1: ggml_type = 3;
-pub const ggml_type_GGML_TYPE_Q8_0: ggml_type = 4;
-pub const ggml_type_GGML_TYPE_I8: ggml_type = 5;
-pub const ggml_type_GGML_TYPE_I16: ggml_type = 6;
-pub const ggml_type_GGML_TYPE_I32: ggml_type = 7;
-pub const ggml_type_GGML_TYPE_Q4_1_O: ggml_type = 8;
-pub const ggml_type_GGML_TYPE_COUNT: ggml_type = 9;
+pub const ggml_type_GGML_TYPE_Q4_2: ggml_type = 4;
+pub const ggml_type_GGML_TYPE_Q4_3: ggml_type = 5;
+pub const ggml_type_GGML_TYPE_Q8_0: ggml_type = 6;
+pub const ggml_type_GGML_TYPE_I8: ggml_type = 7;
+pub const ggml_type_GGML_TYPE_I16: ggml_type = 8;
+pub const ggml_type_GGML_TYPE_I32: ggml_type = 9;
+pub const ggml_type_GGML_TYPE_Q4_1_O: ggml_type = 10;
+pub const ggml_type_GGML_TYPE_COUNT: ggml_type = 11;
 pub type ggml_type = ::std::os::raw::c_int;
 pub const ggml_op_GGML_OP_NONE: ggml_op = 0;
 pub const ggml_op_GGML_OP_DUP: ggml_op = 1;
@@ -620,6 +622,9 @@ extern "C" {
     pub fn ggml_element_size(tensor: *const ggml_tensor) -> usize;
 }
 extern "C" {
+    pub fn ggml_is_quantized(type_: ggml_type) -> bool;
+}
+extern "C" {
     pub fn ggml_init(params: ggml_init_params) -> *mut ggml_context;
 }
 extern "C" {
@@ -717,6 +722,13 @@ extern "C" {
 }
 extern "C" {
     pub fn ggml_add(
+        ctx: *mut ggml_context,
+        a: *mut ggml_tensor,
+        b: *mut ggml_tensor,
+    ) -> *mut ggml_tensor;
+}
+extern "C" {
+    pub fn ggml_add_inplace(
         ctx: *mut ggml_context,
         a: *mut ggml_tensor,
         b: *mut ggml_tensor,
@@ -1388,6 +1400,34 @@ extern "C" {
     ) -> usize;
 }
 extern "C" {
+    pub fn ggml_quantize_q4_2(
+        src: *const f32,
+        dst: *mut ::std::os::raw::c_void,
+        n: ::std::os::raw::c_int,
+        k: ::std::os::raw::c_int,
+        hist: *mut i64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn ggml_quantize_q4_3(
+        src: *const f32,
+        dst: *mut ::std::os::raw::c_void,
+        n: ::std::os::raw::c_int,
+        k: ::std::os::raw::c_int,
+        hist: *mut i64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn ggml_quantize_chunk(
+        type_: ggml_type,
+        src: *const f32,
+        dst: *mut ::std::os::raw::c_void,
+        start: ::std::os::raw::c_int,
+        n: ::std::os::raw::c_int,
+        hist: *mut i64,
+    ) -> usize;
+}
+extern "C" {
     pub fn ggml_cpu_has_avx() -> ::std::os::raw::c_int;
 }
 extern "C" {
@@ -1395,6 +1435,12 @@ extern "C" {
 }
 extern "C" {
     pub fn ggml_cpu_has_avx512() -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn ggml_cpu_has_avx512_vbmi() -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn ggml_cpu_has_avx512_vnni() -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn ggml_cpu_has_fma() -> ::std::os::raw::c_int;
@@ -1416,6 +1462,9 @@ extern "C" {
 }
 extern "C" {
     pub fn ggml_cpu_has_blas() -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn ggml_cpu_has_cublas() -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn ggml_cpu_has_sse3() -> ::std::os::raw::c_int;

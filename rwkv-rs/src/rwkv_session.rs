@@ -377,7 +377,6 @@ impl InferenceSession {
         ctx.op_set_i32_1d(&self.token_index, 0, *input_tokens);
 
         ctx.graph_compute(&mut self.graph);
-
         // let p0 = check_date(&self.state_parts[0]);
         // let p1 = check_date(&self.state_parts[1]);
         // let p2 = check_date(&self.state_parts[2]);
@@ -385,7 +384,6 @@ impl InferenceSession {
         // let p4 = check_date(&self.state_parts[4]);
         //
         // let s1 = check_date(&self.state);
-
         for i in 0..(n_layer * 5) {
             let part = &self.state_parts[i];
             unsafe {
